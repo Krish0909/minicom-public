@@ -40,6 +40,7 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'channels',
     'minicom',
 )
 
@@ -74,6 +75,14 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'minicom.wsgi.application'
+ASGI_APPLICATION = 'minicom.asgi.application'
+
+# WebSocket channel layers (using in-memory for simplicity)
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
+    }
+}
 
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_URLS_REGEX = r'.*'

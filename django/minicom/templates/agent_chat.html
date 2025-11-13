@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Agent Chat - Customer {{ customer_id }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 700px; margin: 30px auto; padding: 20px; }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .header h2 { margin: 0; color: #333; }
+        .takeover-btn {
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .takeover-btn:hover { background: #218838; }
+        .takeover-btn.active { background: #007bff; cursor: default; }
+        #chat-container {
+            border: 1px solid #ccc;
+            height: 450px;
+            overflow-y: scroll;
+            padding: 15px;
+            background: #fafafa;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .message {
+            margin: 12px 0;
+            padding: 10px;
+            border-radius: 5px;
+            max-width: 80%;
+        }
+        .customer {
+            background: #e3f2fd;
+            margin-left: auto;
+            text-align: right;
+        }
+        .bot {
+            background: #fff3e0;
+        }
+        .agent {
+            background: #d4edda;
+        }
+        .sender-label {
+            font-weight: bold;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .customer .sender-label { color: #1565c0; }
+        .bot .sender-label { color: #e65100; }
+        .agent .sender-label { color: #2e7d32; }
+        #message-form {
+            display: flex;
+            gap: 10px;
+        }
+        #message-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        #send-btn {
+            padding: 12px 25px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #send-btn:hover { background: #0056b3; }
+        #send-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 15px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .status-indicator {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 3px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .status-bot { background: #fff3cd; color: #856404; }
+        .status-human { background: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <a href="/agent/dashboard/" class="back-link">← Back to Dashboard</a>
+
+    <div class="header">
+        <div>
+            <h2>Chat with: {{ customer_id }}</h2>
+            <span id="status-badge" class="status-indicator status-bot">🤖 Bot Active</span>
+        </div>
+        <button id="takeover-btn" class="takeover-btn" onclick="takeOverChat()">
+            Take Over Chat
+        </button>
+    </div>
+
+    <!-- Chat messages display -->
+    <div id="chat-container"></div>
+
+    <!-- Agent message input form -->
+    <form id="message-form">
+        <input
+            type="text"
+            id="message-input"
+            placeholder="Type your message to the customer..."
+            autocomplete="off"
+            required
+            disabled
+        >
+        <button type="submit" id="send-btn" disabled>Send</button>
+    </form>
+
+    <script>
+        const customerId = "{{ customer_id }}";
+        let isBotActive = true;
+
+        // Establish WebSocket connection
+        const socket = new WebSocket(`ws://${window.location.host}/ws/chat/${customerId}/`);
+
+        socket.onopen = function(e) {
+            console.log('Agent connected to WebSocket');
+        };
+
+        socket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+
+            // Handle message history
+            if (data.type === 'history') {
+                data.messages.forEach(msg => {
+                    displayMessage(msg.sender, msg.content);
+                });
+            }
+
+            // Handle new messages
+            if (data.type === 'message') {
+                displayMessage(data.sender, data.message);
+            }
+        };
+
+        socket.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
+
+        socket.onclose = function(e) {
+            console.log('WebSocket closed');
+        };
+
+        // Display message in chat
+        function displayMessage(sender, content) {
+            const chatContainer = document.getElementById('chat-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+
+            const label = document.createElement('div');
+            label.className = 'sender-label';
+            label.textContent = sender === 'customer' ? '👤 Customer' :
+                               sender === 'bot' ? '🤖 Bot' : '🎧 Agent (You)';
+
+            const text = document.createElement('div');
+            text.textContent = content;
+
+            messageDiv.appendChild(label);
+            messageDiv.appendChild(text);
+            chatContainer.appendChild(messageDiv);
+
+            // Auto-scroll to bottom
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Agent takes over the chat (disables bot)
+        function takeOverChat() {
+            fetch(`/api/agent/takeover/${customerId}/`, {
+                method: 'POST',
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    isBotActive = false;
+                    updateUIForTakeover();
+                }
+            });
+        }
+
+        // Update UI when agent takes over
+        function updateUIForTakeover() {
+            document.getElementById('takeover-btn').textContent = 'You are Active';
+            document.getElementById('takeover-btn').classList.add('active');
+            document.getElementById('takeover-btn').disabled = true;
+
+            document.getElementById('status-badge').textContent = '👤 Human Agent';
+            document.getElementById('status-badge').classList.remove('status-bot');
+            document.getElementById('status-badge').classList.add('status-human');
+
+            // Enable message input
+            document.getElementById('message-input').disabled = false;
+            document.getElementById('send-btn').disabled = false;
+        }
+
+        // Send agent message
+        document.getElementById('message-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+
+            if (message) {
+                // Send via WebSocket with 'agent' sender type
+                socket.send(JSON.stringify({
+                    'message': message,
+                    'sender': 'agent'
+                }));
+
+                input.value = '';
+            }
+        });
+    </script>
+</body>
+</html>

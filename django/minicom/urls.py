@@ -15,15 +15,22 @@ Including another URLconf
 """
 
 from django.urls import include, path
-
-from minicom import api
+from minicom import api, views
 
 urlpatterns = [
-    # Examples:
-    # re_path(r'^$', 'minicom.views.home', name='home'),
-    # re_path(r'^blog/', include('blog.urls')),
-    # path('blog/', include('blog.urls')),
-
+    # Original test endpoints
     path('foo', api.verify),
-    path('bar', api.verify)
+    path('bar', api.verify),
+
+    # Customer chat interface (HTML view)
+    path('chat/<str:customer_id>/', views.chat_view, name='chat'),
+
+    # Agent interfaces (HTML views)
+    path('agent/dashboard/', views.agent_dashboard_view, name='agent_dashboard_view'),
+    path('agent/chat/<str:customer_id>/', views.agent_chat_view, name='agent_chat_view'),
+
+    # API endpoints
+    path('api/conversation/<str:customer_id>/', views.get_conversation, name='get_conversation'),
+    path('api/agent/dashboard/', views.agent_dashboard_api, name='agent_dashboard_api'),
+    path('api/agent/takeover/<str:customer_id>/', views.agent_takeover, name='agent_takeover'),
 ]
